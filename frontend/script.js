@@ -91,7 +91,7 @@ class ConsistencyCheckerUI {
             const data = await response.json();
             
             if (data.success) {
-                this.updateStatusDisplay(data.status);
+                this.updateStatusDisplay(data.data);
             } else {
                 this.showNotification('Failed to load status', 'error');
             }
@@ -324,7 +324,7 @@ class ConsistencyCheckerUI {
             } else {
                 // For now, we'll show a simplified view
                 // In a real implementation, you might want an endpoint to get full report details
-                const response = await fetch(`${this.apiBase}/reports`);
+                const response = await fetch(`${this.apiBase}/report/latest`);
                 const data = await response.json();
                 report = data.reports.find(r => r.id === reportId);
             }
