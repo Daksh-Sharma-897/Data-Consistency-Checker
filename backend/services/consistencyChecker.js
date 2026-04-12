@@ -33,6 +33,8 @@ class ConsistencyChecker {
       duration: 0
     };
 
+    this.currentCheck = report;
+
     try {
       console.log(`Starting consistency check for collection: ${collectionName}`);
       
@@ -106,7 +108,7 @@ class ConsistencyChecker {
     } finally {
       report.duration = Date.now() - startTime;
       this.isRunning = false;
-      this.currentCheck = null;
+      this.currentCheck = null; // Clear after completion
       
       console.log(`Consistency check completed for ${collectionName}:`);
       console.log(`- Total documents: ${report.totalDocuments}`);
@@ -127,8 +129,8 @@ class ConsistencyChecker {
   async updateConsistencyStatus(collectionName, report) {
     try {
       // Consistency status is stored to track the overall health of the collection
-      const isConsistent = report.inconsistenciesFound === 0 || 
-                          (report.inconsistenciesFound === report.repairsApplied + report.documentsDeleted);
+      // It is only truly consistent if there are NO issues AND NO errors
+      const isConsistent = report.inconsistenciesFound === 0 && report.errors.length === 0;
       
       await Status.findOneAndUpdate(
         { collectionName: collectionName },

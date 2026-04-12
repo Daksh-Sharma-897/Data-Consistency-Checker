@@ -1,0 +1,13 @@
+{
+  "name": "data-consistency-checker",
+  "version": "1.0.0",
+  "description": "Root package for Data Consistency Checker",
+  "scripts": {
+    "install-all": "cd backend && npm install",
+    "seed": "cd backend && npm run seed",
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev"
+  },
+  "author": "",
+  "license": "MIT"
+}
