@@ -8,13 +8,14 @@ class ConsistencyCheckerUI {
         
         this.initializeElements();
         this.attachEventListeners();
+        this.initializeTheme();
         this.loadInitialData();
     }
 
     initializeElements() {
         // Status elements
         this.statusIndicator = document.getElementById('status-indicator');
-        this.statusText = document.querySelector('.status-text');
+        this.statusText = this.statusIndicator.querySelector('.status-text');
         this.lastCheckTime = document.getElementById('last-check-time');
         this.lastConsistentTime = document.getElementById('last-consistent-time');
         this.checkStatus = document.getElementById('check-status');
@@ -48,10 +49,32 @@ class ConsistencyCheckerUI {
         this.modalClose = document.getElementById('modal-close');
         this.modalBody = document.getElementById('modal-body');
         
-        // Notification element
+        // Notification elements
         this.notification = document.getElementById('notification');
         this.notificationIcon = document.getElementById('notification-icon');
         this.notificationMessage = document.getElementById('notification-message');
+        this.notificationClose = this.notification.querySelector('.notification-close');
+        
+        // Theme toggle
+        this.themeToggle = document.getElementById('theme-toggle');
+    }
+
+    // Theme Management
+    initializeTheme() {
+        // Check for saved theme preference or default to dark
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        this.setTheme(savedTheme);
+    }
+
+    setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+    }
+
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        this.setTheme(newTheme);
     }
 
     attachEventListeners() {
@@ -62,9 +85,17 @@ class ConsistencyCheckerUI {
         this.collectionFilter.addEventListener('change', () => this.loadReports());
         this.modalClose.addEventListener('click', () => this.closeModal());
         
+        // Theme toggle
+        this.themeToggle.addEventListener('click', () => this.toggleTheme());
+        
+        // Notification close
+        this.notificationClose.addEventListener('click', () => {
+            this.notification.classList.add('hidden');
+        });
+        
         // Close modal on outside click
         this.reportModal.addEventListener('click', (e) => {
-            if (e.target === this.reportModal) {
+            if (e.target === this.reportModal || e.target.classList.contains('modal-overlay')) {
                 this.closeModal();
             }
         });
@@ -102,15 +133,12 @@ class ConsistencyCheckerUI {
     }
 
     updateStatusDisplay(status) {
-        const statusDot = this.statusIndicator.querySelector('.status-dot');
-        const checkIndicator = this.checkStatus.querySelector('.check-indicator');
-        
         // Update consistency status
         if (status.isConsistent) {
-            statusDot.className = 'status-dot consistent';
+            this.statusIndicator.className = 'status-badge consistent';
             this.statusText.textContent = 'Consistent';
         } else {
-            statusDot.className = 'status-dot inconsistent';
+            this.statusIndicator.className = 'status-badge inconsistent';
             this.statusText.textContent = 'Inconsistent';
         }
         
@@ -130,14 +158,14 @@ class ConsistencyCheckerUI {
         
         // Update active check status
         if (status.isActive) {
-            checkIndicator.className = 'check-indicator active';
-            this.checkText.textContent = 'Check in progress...';
+            this.checkStatus.className = 'check-status active';
+            this.checkText.textContent = 'In Progress';
             this.isChecking = true;
             this.runCheckBtn.disabled = true;
             this.showLoadingSection();
         } else {
-            checkIndicator.className = 'check-indicator';
-            this.checkText.textContent = 'No active check';
+            this.checkStatus.className = 'check-status';
+            this.checkText.textContent = 'Idle';
             this.isChecking = false;
             this.runCheckBtn.disabled = false;
             this.hideLoadingSection();
@@ -240,47 +268,64 @@ class ConsistencyCheckerUI {
     createReportCard(report, isLatest = false) {
         const statusClass = this.getReportStatusClass(report.status);
         const duration = report.durationFormatted || this.formatDuration(report.duration);
+        const statusColors = {
+            'clean': '#22c55e',
+            'repaired': '#6366f1',
+            'error': '#ef4444',
+            'partial': '#f59e0b'
+        };
+        const statusColor = statusColors[report.status] || '#f59e0b';
         
         return `
-            <div class="report-card" data-report-id="${report.id}">
-                <div class="report-header">
-                    <div class="report-title">
-                        ${isLatest ? 'Latest Report' : `Report #${report.id}`}
-                        <br><small>${this.formatDateTime(report.timestamp)}</small>
+            <div class="report-card glass-card" data-report-id="${report.id}" style="padding: 24px; margin-bottom: 16px;">
+                <div class="report-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                    <div class="report-title" style="flex: 1;">
+                        <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                            ${isLatest ? 'Latest Report' : `Report #${report.id}`}
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">${this.formatDateTime(report.timestamp)}</div>
                     </div>
-                    <div class="report-status ${statusClass}">${report.status}</div>
-                </div>
-                
-                <div class="report-metrics">
-                    <div class="metric">
-                        <div class="metric-value">${report.totalDocuments}</div>
-                        <div class="metric-label">Total Docs</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">${report.inconsistenciesFound}</div>
-                        <div class="metric-label">Inconsistencies</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">${report.repairsApplied}</div>
-                        <div class="metric-label">Repairs</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">${report.documentsDeleted}</div>
-                        <div class="metric-label">Deleted</div>
+                    <div class="report-status" style="padding: 6px 12px; border-radius: 50px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; background: ${statusColor}20; color: ${statusColor};">
+                        ${report.status}
                     </div>
                 </div>
                 
-                <div class="report-details">
-                    <p><strong>Collection:</strong> ${report.collection}</p>
-                    <p><strong>Duration:</strong> ${duration}</p>
-                    ${report.errors.length > 0 ? `<p><strong>Errors:</strong> ${report.errors.length}</p>` : ''}
+                <div class="report-metrics" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; padding: 16px; background: var(--bg-secondary); border-radius: 12px;">
+                    <div class="metric" style="text-align: center;">
+                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-primary);">${report.totalDocuments}</div>
+                        <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Docs</div>
+                    </div>
+                    <div class="metric" style="text-align: center;">
+                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-warning);">${report.inconsistenciesFound}</div>
+                        <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Inconsistencies</div>
+                    </div>
+                    <div class="metric" style="text-align: center;">
+                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-success);">${report.repairsApplied}</div>
+                        <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Repairs</div>
+                    </div>
+                    <div class="metric" style="text-align: center;">
+                        <div class="metric-value" style="font-size: 1.5rem; font-weight: 700; color: var(--accent-error);">${report.documentsDeleted}</div>
+                        <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Deleted</div>
+                    </div>
                 </div>
                 
-                <div class="report-actions">
-                    <button class="btn btn-small view-details-btn" data-report-id="${report.id}">
+                <div class="report-details" style="margin-bottom: 16px; padding: 12px 16px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 8px;">
+                        <span style="color: var(--text-muted);">Collection:</span>
+                        <span style="color: var(--text-primary); font-weight: 500;">${report.collection}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                        <span style="color: var(--text-muted);">Duration:</span>
+                        <span style="color: var(--text-primary); font-weight: 500;">${duration}</span>
+                    </div>
+                    ${report.errors.length > 0 ? `<div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-top: 8px;"><span style="color: var(--accent-error);">Errors:</span><span style="color: var(--accent-error); font-weight: 600;">${report.errors.length}</span></div>` : ''}
+                </div>
+                
+                <div class="report-actions" style="display: flex; gap: 12px;">
+                    <button class="btn btn-small view-details-btn" data-report-id="${report.id}" style="flex: 1;">
                         View Details
                     </button>
-                    ${!isLatest ? `<button class="btn btn-small delete-report-btn" data-report-id="${report.id}">Delete</button>` : ''}
+                    ${!isLatest ? `<button class="btn btn-small btn-secondary delete-report-btn" data-report-id="${report.id}">Delete</button>` : ''}
                 </div>
             </div>
         `;
@@ -343,54 +388,74 @@ class ConsistencyCheckerUI {
     }
 
     showReportModal(report) {
+        const statusColors = {
+            'clean': '#22c55e',
+            'repaired': '#6366f1',
+            'error': '#ef4444',
+            'partial': '#f59e0b'
+        };
+        const statusColor = statusColors[report.status] || '#f59e0b';
+        
         const detailsHtml = `
-            <div class="report-details-full">
-                <h4>Report Information</h4>
-                <p><strong>ID:</strong> ${report.id}</p>
-                <p><strong>Collection:</strong> ${report.collection}</p>
-                <p><strong>Timestamp:</strong> ${this.formatDateTime(report.timestamp)}</p>
-                <p><strong>Duration:</strong> ${report.durationFormatted || this.formatDuration(report.duration)}</p>
-                <p><strong>Status:</strong> <span class="report-status ${this.getReportStatusClass(report.status)}">${report.status}</span></p>
+            <div class="report-details-full" style="color: var(--text-primary);">
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Report Information</h4>
+                    <div style="background: var(--bg-secondary); border-radius: 12px; padding: 16px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.875rem;">
+                            <div><span style="color: var(--text-muted);">ID:</span> <span style="font-weight: 500;">${report.id}</span></div>
+                            <div><span style="color: var(--text-muted);">Collection:</span> <span style="font-weight: 500;">${report.collection}</span></div>
+                            <div><span style="color: var(--text-muted);">Timestamp:</span> <span style="font-weight: 500;">${this.formatDateTime(report.timestamp)}</span></div>
+                            <div><span style="color: var(--text-muted);">Duration:</span> <span style="font-weight: 500;">${report.durationFormatted || this.formatDuration(report.duration)}</span></div>
+                            <div style="grid-column: 1 / -1;"><span style="color: var(--text-muted);">Status:</span> <span style="font-weight: 600; color: ${statusColor}; text-transform: uppercase;">${report.status}</span></div>
+                        </div>
+                    </div>
+                </div>
                 
-                <h4>Summary</h4>
-                <div class="report-metrics">
-                    <div class="metric">
-                        <div class="metric-value">${report.totalDocuments}</div>
-                        <div class="metric-label">Total Documents</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">${report.inconsistenciesFound}</div>
-                        <div class="metric-label">Inconsistencies Found</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">${report.repairsApplied}</div>
-                        <div class="metric-label">Repairs Applied</div>
-                    </div>
-                    <div class="metric">
-                        <div class="metric-value">${report.documentsDeleted}</div>
-                        <div class="metric-label">Documents Deleted</div>
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Summary</h4>
+                    <div class="report-metrics" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; background: var(--bg-secondary); border-radius: 12px; padding: 20px;">
+                        <div class="metric" style="text-align: center;">
+                            <div class="metric-value" style="font-size: 1.75rem; font-weight: 700; color: var(--accent-primary);">${report.totalDocuments}</div>
+                            <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted);">Total Documents</div>
+                        </div>
+                        <div class="metric" style="text-align: center;">
+                            <div class="metric-value" style="font-size: 1.75rem; font-weight: 700; color: var(--accent-warning);">${report.inconsistenciesFound}</div>
+                            <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted);">Inconsistencies</div>
+                        </div>
+                        <div class="metric" style="text-align: center;">
+                            <div class="metric-value" style="font-size: 1.75rem; font-weight: 700; color: var(--accent-success);">${report.repairsApplied}</div>
+                            <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted);">Repairs</div>
+                        </div>
+                        <div class="metric" style="text-align: center;">
+                            <div class="metric-value" style="font-size: 1.75rem; font-weight: 700; color: var(--accent-error);">${report.documentsDeleted}</div>
+                            <div class="metric-label" style="font-size: 0.75rem; color: var(--text-muted);">Deleted</div>
+                        </div>
                     </div>
                 </div>
                 
                 ${report.errors.length > 0 ? `
-                    <h4>Errors</h4>
-                    <ul>
-                        ${report.errors.map(error => `<li>${error}</li>`).join('')}
-                    </ul>
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--accent-error); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Errors (${report.errors.length})</h4>
+                        <ul style="background: rgba(239, 68, 68, 0.1); border-radius: 12px; padding: 16px 16px 16px 32px; color: var(--accent-error);">
+                            ${report.errors.map(error => `<li style="margin-bottom: 4px;">${error}</li>`).join('')}
+                        </ul>
+                    </div>
                 ` : ''}
                 
                 ${report.details && report.details.length > 0 ? `
-                    <h4>Repair Details</h4>
-                    <div class="details-list">
-                        ${report.details.map(detail => `
-                            <div class="detail-item">
-                                <strong>Document:</strong> ${detail.documentId}<br>
-                                <strong>Issue:</strong> ${detail.issue}<br>
-                                <strong>Action:</strong> ${detail.action}
-                                ${detail.oldValue !== undefined ? `<br><strong>Old Value:</strong> ${detail.oldValue}` : ''}
-                                ${detail.newValue !== undefined ? `<br><strong>New Value:</strong> ${detail.newValue}` : ''}
-                            </div>
-                        `).join('')}
+                    <div>
+                        <h4 style="font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">Repair Details (${report.details.length})</h4>
+                        <div class="details-list" style="display: flex; flex-direction: column; gap: 12px;">
+                            ${report.details.map(detail => `
+                                <div class="detail-item" style="background: var(--bg-tertiary); border-radius: 8px; padding: 12px 16px; font-size: 0.875rem; border-left: 3px solid var(--accent-primary);">
+                                    <div style="margin-bottom: 4px;"><span style="color: var(--text-muted);">Document:</span> <span style="font-weight: 500; font-family: monospace;">${detail.documentId}</span></div>
+                                    <div style="margin-bottom: 4px;"><span style="color: var(--text-muted);">Issue:</span> <span style="color: var(--accent-warning);">${detail.issue}</span></div>
+                                    <div><span style="color: var(--text-muted);">Action:</span> <span style="color: var(--accent-success);">${detail.action}</span></div>
+                                    ${detail.oldValue !== undefined ? `<div style="margin-top: 4px; padding: 4px 8px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; color: var(--accent-error);"><strong>Old:</strong> ${detail.oldValue}</div>` : ''}
+                                    ${detail.newValue !== undefined ? `<div style="margin-top: 4px; padding: 4px 8px; background: rgba(34, 197, 94, 0.1); border-radius: 4px; color: var(--accent-success);"><strong>New:</strong> ${detail.newValue}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 ` : ''}
             </div>
@@ -408,10 +473,10 @@ class ConsistencyCheckerUI {
         if (this.reportsHistorySection.classList.contains('hidden')) {
             this.reportsHistorySection.classList.remove('hidden');
             await this.loadReports();
-            this.viewReportsBtn.textContent = 'Hide Reports';
+            this.viewReportsBtn.querySelector('.btn-text').textContent = 'Hide Reports';
         } else {
             this.reportsHistorySection.classList.add('hidden');
-            this.viewReportsBtn.innerHTML = '<span class="btn-icon">📊</span>View All Reports';
+            this.viewReportsBtn.querySelector('.btn-text').textContent = 'View All Reports';
         }
     }
 
@@ -516,6 +581,36 @@ s
             return `${(ms / 1000).toFixed(2)}s`;
         } else {
             return `${(ms / 60000).toFixed(2)}m`;
+        }
+    }
+
+    async deleteReport(reportId) {
+        if (!confirm('Are you sure you want to delete this report?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${this.apiBase}/reports/${reportId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showNotification('Report deleted successfully', 'success');
+                // Refresh the reports list
+                await this.loadReports();
+                // Also refresh statistics
+                await this.loadStatistics();
+            } else {
+                this.showNotification(`Failed to delete report: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            this.showNotification('Error deleting report', 'error');
         }
     }
 }
