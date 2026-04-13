@@ -144,10 +144,42 @@
                         Latest Report
                     </h2>
                 </div>
-                <div id="latest-report-content" class="glass-card" style="border-radius: var(--radius-lg);">
-                    <div class="empty-state">
-                        <div class="empty-icon">📭</div>
-                        <p>No reports available. Run a consistency check to generate a report.</p>
+                <div class="status-grid" id="latest-report-content">
+                    <div class="status-card glass-card" id="latest-report-card">
+                        <div class="card-header">
+                            <h3>Report Status</h3>
+                            <div class="status-badge" id="latest-report-status">
+                                <span class="status-pulse"></span>
+                                <span class="status-text">No Report</span>
+                            </div>
+                        </div>
+                        <div class="empty-state" id="latest-report-empty">
+                            <div class="empty-icon">📭</div>
+                            <p>No reports available. Run a consistency check to generate a report.</p>
+                        </div>
+                        <div class="status-details hidden" id="latest-report-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Collection</span>
+                                <span class="detail-value" id="latest-report-collection">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Documents</span>
+                                <span class="detail-value" id="latest-report-docs">0</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Inconsistencies</span>
+                                <span class="detail-value" id="latest-report-issues">0</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Repairs</span>
+                                <span class="detail-value" id="latest-report-repairs">0</span>
+                            </div>
+                        </div>
+                        <div class="report-actions hidden" id="latest-report-actions" style="margin-top: 16px; display: flex; gap: 12px;">
+                            <button class="btn btn-small view-details-btn" id="latest-view-details-btn" style="flex: 1;">
+                                View Full Details
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -159,24 +191,31 @@
                         <span class="section-icon">📚</span>
                         Reports History
                     </h2>
-                    <div class="reports-controls">
-                        <select id="collection-filter" class="filter-select">
-                            <option value="">All Collections</option>
-                            <option value="users">Users</option>
-                        </select>
-                        <button id="refresh-reports-btn" class="btn btn-small">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="23,4 23,10 17,10"/>
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                            </svg>
-                            Refresh
-                        </button>
-                    </div>
                 </div>
-                <div id="reports-list" class="reports-list">
-                    <div class="loading-state">
-                        <div class="loading-spinner-small"></div>
-                        <p>Loading reports...</p>
+                <div class="status-grid">
+                    <div class="status-card glass-card" style="grid-column: 1 / -1;">
+                        <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                            <h3>All Reports</h3>
+                            <div class="reports-controls" style="margin-left: auto;">
+                                <select id="collection-filter" class="filter-select">
+                                    <option value="">All Collections</option>
+                                    <option value="users">Users</option>
+                                </select>
+                                <button id="refresh-reports-btn" class="btn btn-small">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="23,4 23,10 17,10"/>
+                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                    </svg>
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div id="reports-list" class="reports-list" style="max-height: 500px; overflow-y: auto;">
+                            <div class="loading-state">
+                                <div class="loading-spinner-small"></div>
+                                <p>Loading reports...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
