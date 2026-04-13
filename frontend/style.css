@@ -935,6 +935,22 @@ body {
   .header-content {
     flex-direction: column;
     text-align: center;
+    gap: 16px;
+  }
+  
+  .header-content > div:last-child {
+    flex-direction: row;
+    justify-content: center;
+    width: 100%;
+  }
+  
+  #connection-manager button {
+    font-size: 0.75rem;
+    padding: 8px 12px;
+  }
+  
+  #connection-db-name {
+    max-width: 80px !important;
   }
   
   .status-grid,
