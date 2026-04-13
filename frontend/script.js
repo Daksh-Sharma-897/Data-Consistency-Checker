@@ -5,11 +5,35 @@ class ConsistencyCheckerUI {
         this.apiBase = '/api';
         this.isChecking = false;
         this.currentReport = null;
+        this.sessionId = this.getOrCreateSessionId();
+        this.isConnected = false;
         
         this.initializeElements();
         this.attachEventListeners();
         this.initializeTheme();
-        this.loadInitialData();
+        this.initializeConnection();
+    }
+
+    getOrCreateSessionId() {
+        let sessionId = localStorage.getItem('sessionId');
+        if (!sessionId) {
+            sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('sessionId', sessionId);
+        }
+        return sessionId;
+    }
+
+    async initializeConnection() {
+        // Check if there's a saved MongoDB URI
+        const savedUri = localStorage.getItem('mongoUri');
+        
+        if (savedUri) {
+            // Try to reconnect
+            await this.connectToDatabase(savedUri, false);
+        } else {
+            // Show connection modal
+            this.showConnectionModal();
+        }
     }
 
     initializeElements() {
@@ -70,6 +94,19 @@ class ConsistencyCheckerUI {
         
         // Theme toggle
         this.themeToggle = document.getElementById('theme-toggle');
+        
+        // Connection modal elements
+        this.connectionModal = document.getElementById('connection-modal');
+        this.mongoUriInput = document.getElementById('mongo-uri-input');
+        this.testConnectionBtn = document.getElementById('test-connection-btn');
+        this.saveConnectionBtn = document.getElementById('save-connection-btn');
+        this.connectionStatus = document.getElementById('connection-status');
+        this.connectionForm = document.getElementById('connection-form');
+        this.connectedView = document.getElementById('connected-view');
+        this.startUsingBtn = document.getElementById('start-using-btn');
+        this.connectionManager = document.getElementById('connection-manager');
+        this.manageConnectionBtn = document.getElementById('manage-connection-btn');
+        this.connectionDbName = document.getElementById('connection-db-name');
     }
 
     // Theme Management
@@ -106,6 +143,12 @@ class ConsistencyCheckerUI {
             this.notification.classList.add('hidden');
         });
         
+        // Connection modal events
+        this.testConnectionBtn.addEventListener('click', () => this.testConnection());
+        this.saveConnectionBtn.addEventListener('click', () => this.saveConnection());
+        this.startUsingBtn.addEventListener('click', () => this.startUsingDashboard());
+        this.manageConnectionBtn.addEventListener('click', () => this.showConnectionModal());
+        
         // Close modal on outside click
         this.reportModal.addEventListener('click', (e) => {
             if (e.target === this.reportModal || e.target.classList.contains('modal-overlay')) {
@@ -115,10 +158,181 @@ class ConsistencyCheckerUI {
         
         // Auto-refresh status every 30 seconds
         setInterval(() => {
-            if (!this.isChecking) {
+            if (!this.isChecking && this.isConnected) {
                 this.loadStatus();
             }
         }, 30000);
+    }
+
+    // Connection Management Methods
+    showConnectionModal() {
+        this.connectionModal.classList.remove('hidden');
+        this.connectionForm.classList.remove('hidden');
+        this.connectedView.classList.add('hidden');
+        this.saveConnectionBtn.disabled = true;
+        this.connectionStatus.style.display = 'none';
+        
+        // Pre-fill with saved URI if exists
+        const savedUri = localStorage.getItem('mongoUri');
+        if (savedUri) {
+            this.mongoUriInput.value = savedUri;
+        }
+    }
+
+    hideConnectionModal() {
+        this.connectionModal.classList.add('hidden');
+    }
+
+    async testConnection() {
+        const mongoUri = this.mongoUriInput.value.trim();
+        
+        if (!mongoUri) {
+            this.showConnectionStatus('Please enter a MongoDB connection string', 'error');
+            return;
+        }
+
+        this.testConnectionBtn.disabled = true;
+        this.testConnectionBtn.innerHTML = '<span class="loading-spinner-small" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 6px;"></span> Testing...';
+
+        try {
+            const response = await fetch(`${this.apiBase}/connection/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mongoUri })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.data.connected) {
+                this.showConnectionStatus(
+                    `✅ Connected! Database: ${data.data.database}, Collections: ${data.data.collections.length}`,
+                    'success'
+                );
+                this.saveConnectionBtn.disabled = false;
+            } else {
+                this.showConnectionStatus(`❌ ${data.message || 'Connection failed'}`, 'error');
+                this.saveConnectionBtn.disabled = true;
+            }
+        } catch (error) {
+            this.showConnectionStatus('❌ Network error. Please check if server is running.', 'error');
+            this.saveConnectionBtn.disabled = true;
+        } finally {
+            this.testConnectionBtn.disabled = false;
+            this.testConnectionBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22,4 12,14.01 9,11.01"/>
+                </svg>
+                Test Connection
+            `;
+        }
+    }
+
+    async saveConnection() {
+        const mongoUri = this.mongoUriInput.value.trim();
+        
+        if (!mongoUri) {
+            this.showConnectionStatus('Please enter a MongoDB connection string', 'error');
+            return;
+        }
+
+        this.saveConnectionBtn.disabled = true;
+        this.saveConnectionBtn.innerHTML = '<span class="loading-spinner-small" style="width: 16px; height: 16px; border-width: 2px; display: inline-block; vertical-align: middle; margin-right: 6px;"></span> Connecting...';
+
+        try {
+            await this.connectToDatabase(mongoUri, true);
+        } finally {
+            this.saveConnectionBtn.disabled = false;
+            this.saveConnectionBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17,21 17,13 7,13 7,21"/>
+                    <polyline points="7,3 7,8 15,8"/>
+                </svg>
+                Connect
+            `;
+        }
+    }
+
+    async connectToDatabase(mongoUri, showSuccess = true) {
+        try {
+            const response = await fetch(`${this.apiBase}/connection/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    mongoUri,
+                    sessionId: this.sessionId
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.data.connected) {
+                this.isConnected = true;
+                localStorage.setItem('mongoUri', mongoUri);
+                
+                // Show connected view
+                this.connectionForm.classList.add('hidden');
+                this.connectedView.classList.remove('hidden');
+                
+                // Show connection manager
+                this.connectionManager.classList.remove('hidden');
+                this.connectionDbName.textContent = data.data.database;
+                
+                if (showSuccess) {
+                    this.showNotification(`Connected to ${data.data.database}`, 'success');
+                }
+                
+                // Load initial data
+                await this.loadInitialData();
+            } else {
+                this.showConnectionStatus(`❌ ${data.message || 'Connection failed'}`, 'error');
+                if (!showSuccess) {
+                    this.showConnectionModal();
+                }
+            }
+        } catch (error) {
+            console.error('Connection error:', error);
+            this.showConnectionStatus('❌ Failed to connect. Please try again.', 'error');
+            if (!showSuccess) {
+                this.showConnectionModal();
+            }
+        }
+    }
+
+    startUsingDashboard() {
+        this.hideConnectionModal();
+        this.showNotification('Welcome! Your database is ready for consistency checks.', 'success');
+    }
+
+    showConnectionStatus(message, type) {
+        this.connectionStatus.style.display = 'block';
+        this.connectionStatus.textContent = message;
+        this.connectionStatus.style.background = type === 'success' 
+            ? 'rgba(34, 197, 94, 0.1)' 
+            : 'rgba(239, 68, 68, 0.1)';
+        this.connectionStatus.style.color = type === 'success' 
+            ? 'var(--accent-success)' 
+            : 'var(--accent-error)';
+        this.connectionStatus.style.borderLeft = `3px solid ${type === 'success' ? 'var(--accent-success)' : 'var(--accent-error)'}`;
+    }
+
+    async disconnect() {
+        try {
+            await fetch(`${this.apiBase}/connection/disconnect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: this.sessionId })
+            });
+            
+            this.isConnected = false;
+            localStorage.removeItem('mongoUri');
+            this.connectionManager.classList.add('hidden');
+            this.showConnectionModal();
+            this.showNotification('Disconnected from database', 'info');
+        } catch (error) {
+            console.error('Disconnect error:', error);
+        }
     }
 
     async loadInitialData() {

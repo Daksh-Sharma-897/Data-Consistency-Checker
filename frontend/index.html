@@ -340,6 +340,98 @@
         </div>
     </div>
 
+    <!-- Database Connection Modal -->
+    <div id="connection-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-container">
+            <div class="modal-content glass-modal" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>
+                        <span class="modal-icon">🔌</span>
+                        Database Connection
+                    </h3>
+                </div>
+                <div class="modal-body">
+                    <div id="connection-form">
+                        <div style="margin-bottom: 20px;">
+                            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 16px;">
+                                Connect to your MongoDB database to start checking data consistency. Your connection string is stored locally in your browser.
+                            </p>
+                        </div>
+                        
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+                                MongoDB Connection String
+                            </label>
+                            <input 
+                                type="text" 
+                                id="mongo-uri-input" 
+                                placeholder="mongodb+srv://username:password@cluster.mongodb.net/database"
+                                style="width: 100%; padding: 12px 16px; border: 2px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.875rem; background: var(--bg-secondary); color: var(--text-primary); font-family: monospace;"
+                            >
+                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+                                Format: mongodb:// or mongodb+srv://
+                            </p>
+                        </div>
+
+                        <div style="margin-bottom: 20px; padding: 12px 16px; background: rgba(245, 158, 11, 0.1); border-radius: var(--radius-md); border-left: 3px solid var(--accent-warning);">
+                            <p style="font-size: 0.75rem; color: var(--accent-warning); margin: 0;">
+                                <strong>⚠ Security Note:</strong> Use a read-only database user. Never share admin credentials. The connection string is stored in your browser's localStorage.
+                            </p>
+                        </div>
+
+                        <div style="display: flex; gap: 12px;">
+                            <button id="test-connection-btn" class="btn btn-secondary" style="flex: 1;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22,4 12,14.01 9,11.01"/>
+                                </svg>
+                                Test Connection
+                            </button>
+                            <button id="save-connection-btn" class="btn btn-primary" style="flex: 1;" disabled>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17,21 17,13 7,13 7,21"/>
+                                    <polyline points="7,3 7,8 15,8"/>
+                                </svg>
+                                Connect
+                            </button>
+                        </div>
+
+                        <div id="connection-status" style="margin-top: 16px; padding: 12px; border-radius: var(--radius-md); display: none;"></div>
+                    </div>
+
+                    <div id="connected-view" class="hidden">
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: rgba(34, 197, 94, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">
+                                ✅
+                            </div>
+                            <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Connected Successfully</h4>
+                            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 20px;">
+                                Your database is ready for consistency checks.
+                            </p>
+                            <button id="start-using-btn" class="btn btn-primary" style="width: 100%;">
+                                Start Using Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Manager (shown in header when connected) -->
+    <div id="connection-manager" class="hidden" style="position: fixed; top: 24px; right: 100px; z-index: 100;">
+        <button id="manage-connection-btn" class="btn btn-small" style="background: var(--bg-glass); backdrop-filter: blur(10px);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            <span id="connection-db-name">Database</span>
+        </button>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
