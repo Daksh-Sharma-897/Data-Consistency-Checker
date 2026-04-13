@@ -25,7 +25,7 @@ class ReportGenerator {
    */
   async getLatestReport(collection = null) {
     try {
-      const query = collection ? { collectionName: collection } : {};
+      const query = collection ? { collection } : {};
       const report = await Report.findOne(query).sort({ timestamp: -1 });
       return report;
     } catch (error) {
@@ -40,9 +40,9 @@ class ReportGenerator {
    * @param {number} limit - Maximum number of reports to return
    * @returns {Array} Array of reports
    */
-  async getAllReports(collectionName = null, limit = 50) {
+  async getAllReports(collection = null, limit = 50) {
     try {
-      const query = collectionName ? { collectionName } : {};
+      const query = collection ? { collection } : {};
       const reports = await Report.find(query)
         .sort({ timestamp: -1 })
         .limit(limit);
@@ -86,9 +86,9 @@ class ReportGenerator {
    * @param {string} collection - Optional collection filter
    * @returns {Object} Summary statistics
    */
-  async generateSummaryStats(collectionName = null) {
+  async generateSummaryStats(collection = null) {
     try {
-      const matchStage = collectionName ? { $match: { collectionName } } : { $match: {} };
+      const matchStage = collection ? { $match: { collection } } : { $match: {} };
       
       const stats = await Report.aggregate([
         matchStage,
@@ -139,7 +139,7 @@ class ReportGenerator {
       };
       
       if (collection) {
-        query.collectionName = collection;
+        query.collection = collection;
       }
       
       const result = await Report.deleteMany(query);
@@ -162,7 +162,7 @@ class ReportGenerator {
     return {
       id: report._id ? report._id.toString() : null,
       timestamp: report.timestamp,
-      collectionName: report.collectionName,
+      collection: report.collection,
       totalDocuments: report.totalDocuments,
       inconsistenciesFound: report.inconsistenciesFound,
       repairsApplied: report.repairsApplied,

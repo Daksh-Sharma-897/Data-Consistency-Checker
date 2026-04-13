@@ -1,5 +1,4 @@
 const { validateDocument, repairDocument } = require('../validationRules');
-const Status = require('../models/Status');
 
 class ConsistencyChecker {
   constructor() {
@@ -23,7 +22,7 @@ class ConsistencyChecker {
     
     const report = {
       timestamp: new Date(),
-      collectionName: collectionName,
+      collection: collectionName,
       totalDocuments: 0,
       inconsistenciesFound: 0,
       repairsApplied: 0,
@@ -32,8 +31,6 @@ class ConsistencyChecker {
       details: [],
       duration: 0
     };
-
-    this.currentCheck = report;
 
     try {
       console.log(`Starting consistency check for collection: ${collectionName}`);
@@ -98,8 +95,8 @@ class ConsistencyChecker {
         }
       }
 
-      // Consistency status will be updated by the caller after saving the report
-      console.log(`Scanning completed for ${collectionName}.`);
+      // Update eventual consistency status
+      await this.updateConsistencyStatus(collectionName, report);
 
     } catch (error) {
       const errorMsg = `Consistency check failed: ${error.message}`;
@@ -108,7 +105,7 @@ class ConsistencyChecker {
     } finally {
       report.duration = Date.now() - startTime;
       this.isRunning = false;
-      this.currentCheck = null; // Clear after completion
+      this.currentCheck = null;
       
       console.log(`Consistency check completed for ${collectionName}:`);
       console.log(`- Total documents: ${report.totalDocuments}`);
@@ -128,19 +125,22 @@ class ConsistencyChecker {
    */
   async updateConsistencyStatus(collectionName, report) {
     try {
-      // Consistency status is stored to track the overall health of the collection
-      // It is only truly consistent if there are NO issues AND NO errors
-      const isConsistent = report.inconsistenciesFound === 0 && report.errors.length === 0;
+      // For simplicity, we'll store status in a separate collection
+      // In a real system, this would check replica set status
+      const Status = require('../models/Status');
+      
+      const isConsistent = report.inconsistenciesFound === 0 || 
+                          (report.inconsistenciesFound === report.repairsApplied + report.documentsDeleted);
       
       await Status.findOneAndUpdate(
-        { collectionName: collectionName },
+        { collection: collectionName },
         {
-          collectionName: collectionName,
+          collection: collectionName,
           isConsistent,
           lastCheckTime: new Date(),
           lastConsistentTime: isConsistent ? new Date() : undefined,
           allReplicasConsistent: isConsistent, // Simulated
-          lastReportId: report._id || report.id
+          lastReportId: report._id
         },
         { upsert: true, new: true }
       );
@@ -158,11 +158,12 @@ class ConsistencyChecker {
    */
   async getConsistencyStatus(collectionName) {
     try {
-      const status = await Status.findOne({ collectionName: collectionName });
+      const Status = require('../models/Status');
+      const status = await Status.findOne({ collection: collectionName });
       
       if (!status) {
         return {
-          collectionName: collectionName,
+          collection: collectionName,
           isConsistent: false,
           lastCheckTime: null,
           lastConsistentTime: null,
@@ -172,7 +173,7 @@ class ConsistencyChecker {
       }
       
       return {
-        collectionName: status.collectionName,
+        collection: status.collection,
         isConsistent: status.isConsistent,
         lastCheckTime: status.lastCheckTime,
         lastConsistentTime: status.lastConsistentTime,

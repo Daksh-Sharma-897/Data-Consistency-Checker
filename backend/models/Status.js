@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const statusSchema = new mongoose.Schema({
-  collectionName: {
+  collection: {
     type: String,
     required: true,
     unique: true

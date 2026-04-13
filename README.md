@@ -1,4 +1,4 @@
-# Data Consistency Checker
+ # Data Consistency Checker
 
 A comprehensive full-stack application for monitoring and maintaining data consistency across MongoDB collections. This system provides automated consistency checks, data repair capabilities, detailed reporting, and a beautiful dashboard for monitoring.
 
