@@ -4,6 +4,7 @@ const router = express.Router();
 const ConsistencyChecker = require('../services/consistencyChecker');
 const ReportGenerator = require('../services/reportGenerator');
 const User = require('../models/User');
+const Report = require('../models/Report');
 
 // Constants
 const VALID_COLLECTIONS = ['users'];
@@ -210,6 +211,40 @@ router.post('/cleanup', async (req, res) => {
 
   } catch (error) {
     console.error('[ERROR] /cleanup:', error);
+    return errorResponse(res, 500, error.message);
+  }
+});
+
+/**
+ * DELETE /api/reports/:id
+ * Delete a specific report by ID
+ */
+router.delete('/reports/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID format
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return errorResponse(res, 400, 'Invalid report ID format');
+    }
+
+    // Find and delete the report
+    const deletedReport = await Report.findByIdAndDelete(id);
+
+    if (!deletedReport) {
+      return errorResponse(res, 404, 'Report not found');
+    }
+
+    console.log(`[DELETE] Report ${id} deleted successfully`);
+
+    return successResponse(
+      res,
+      { deletedId: id },
+      'Report deleted successfully'
+    );
+
+  } catch (error) {
+    console.error('[ERROR] DELETE /reports/:id:', error);
     return errorResponse(res, 500, error.message);
   }
 });
