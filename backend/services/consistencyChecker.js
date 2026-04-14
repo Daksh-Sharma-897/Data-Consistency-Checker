@@ -55,12 +55,20 @@ class ConsistencyChecker {
 
           if (issues.length > 0) {
             report.inconsistenciesFound += issues.length;
+            console.log(`[DEBUG] Document ${doc._id} has ${issues.length} issues:`, issues.map(i => i.issue));
 
             // Attempt to repair the document
             const repairResult = this.dynamicValidator.repairDocument(doc, issues, schema);
+            console.log(`[DEBUG] Repair result for ${doc._id}:`, repairResult.repairs);
 
             if (repairResult.repairs.length > 0) {
-              await Model.findByIdAndUpdate(doc._id, repairResult.document);
+              console.log(`[DEBUG] Updating document ${doc._id} with repairs...`);
+              // Create update object with only the repaired fields (exclude _id)
+              const updateData = { ...repairResult.document };
+              delete updateData._id; // Remove _id from update
+              delete updateData.__v; // Remove version key
+              const updateResult = await Model.findByIdAndUpdate(doc._id, { $set: updateData }, { new: true });
+              console.log(`[DEBUG] Update result:`, updateResult ? 'Success' : 'Failed');
               report.repairsApplied += repairResult.repairs.length;
 
               repairResult.repairs.forEach(repair => {
