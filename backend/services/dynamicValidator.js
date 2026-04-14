@@ -14,12 +14,15 @@ class DynamicValidator {
    * @returns {Object} Inferred schema with field types and required status
    */
   analyzeSchema(documents) {
+    console.log(`[DYNAMIC] Analyzing schema for ${documents.length} documents`);
     if (documents.length === 0) {
+      console.log('[DYNAMIC] No documents to analyze');
       return { fields: {}, requiredFields: [] };
     }
 
     const fieldStats = {};
     const totalDocs = documents.length;
+    console.log(`[DYNAMIC] Total documents: ${totalDocs}`);
 
     // Collect field statistics
     documents.forEach(doc => {
@@ -61,12 +64,15 @@ class DynamicValidator {
       requiredFields: []
     };
 
+    console.log('[DYNAMIC] Field analysis:');
     Object.keys(fieldStats).forEach(field => {
       const stats = fieldStats[field];
       const presence = stats.present / totalDocs;
+      const isRequired = presence > 0.8;
+      console.log(`[DYNAMIC]   ${field}: present in ${stats.present}/${totalDocs} (${(presence*100).toFixed(1)}%) - Required: ${isRequired}`);
 
       // Field is required if present in >80% of documents
-      if (presence > 0.8) {
+      if (isRequired) {
         schema.requiredFields.push(field);
       }
 
@@ -133,18 +139,31 @@ class DynamicValidator {
    */
   validateDocument(document, schema) {
     const issues = [];
+    const docId = document._id ? document._id.toString() : 'unknown';
+    console.log(`[DYNAMIC] Validating document ${docId}`);
+    console.log(`[DYNAMIC]   Required fields: ${schema.requiredFields.join(', ')}`);
+    console.log(`[DYNAMIC]   Document has fields: ${Object.keys(document).filter(k => k !== '_id' && k !== '__v').join(', ')}`);
 
     // Check for missing required fields
     schema.requiredFields.forEach(field => {
       if (document[field] === undefined) {
+        console.log(`[DYNAMIC]   ❌ MISSING: Field '${field}' is undefined in document`);
         issues.push({
           field,
           issue: 'missing_required_field',
           severity: 'high',
           description: `Required field '${field}' is missing (present in ${Math.round(schema.fields[field]?.presence * 100)}% of documents)`
         });
+      } else {
+        console.log(`[DYNAMIC]   ✓ Field '${field}' present: ${document[field]}`);
       }
     });
+
+    if (issues.length === 0) {
+      console.log(`[DYNAMIC]   Document ${docId} has no issues`);
+    } else {
+      console.log(`[DYNAMIC]   Document ${docId} has ${issues.length} issues`);
+    }
 
     // Check field types and nulls
     Object.keys(document).forEach(field => {

@@ -1,19 +1,12 @@
-const { validateDocument, repairDocument } = require('../validationRules');
-const DynamicValidator = require('./dynamicValidator');
+const SimpleValidator = require('./simpleValidator');
 
 class ConsistencyChecker {
   constructor() {
     this.isRunning = false;
     this.currentCheck = null;
-    this.dynamicValidator = new DynamicValidator();
+    this.validator = new SimpleValidator();
   }
 
-  /**
-   * Performs a consistency check on a specified collection
-   * @param {string} collectionName - Name of the collection to check
-   * @param {Object} Model - Mongoose model for the collection
-   * @returns {Object} Detailed report of the consistency check
-   */
   async checkCollection(collectionName, Model) {
     if (this.isRunning) {
       throw new Error('Consistency check already in progress');
@@ -35,107 +28,70 @@ class ConsistencyChecker {
     };
 
     try {
-      console.log(`Starting consistency check for collection: ${collectionName}`);
+      console.log(`[CHECK] Starting consistency check for: ${collectionName}`);
 
-      // Get all documents in the collection
+      // Get all documents
       const documents = await Model.find({}).lean();
       report.totalDocuments = documents.length;
+      console.log(`[CHECK] Found ${documents.length} documents`);
 
-      console.log(`Found ${documents.length} documents to check`);
-
-      // Analyze schema from all documents (dynamic)
-      console.log('Analyzing collection schema...');
-      const schema = this.dynamicValidator.analyzeSchema(documents);
-      console.log(`Detected ${Object.keys(schema.fields).length} fields, ${schema.requiredFields.length} required`);
-
-      for (const doc of documents) {
-        try {
-          // Validate the document using dynamic schema
-          const issues = this.dynamicValidator.validateDocument(doc, schema);
-
-          if (issues.length > 0) {
-            report.inconsistenciesFound += issues.length;
-            console.log(`[DEBUG] Document ${doc._id} has ${issues.length} issues:`, issues.map(i => i.issue));
-
-            // Attempt to repair the document
-            const repairResult = this.dynamicValidator.repairDocument(doc, issues, schema);
-            console.log(`[DEBUG] Repair result for ${doc._id}:`, repairResult.repairs);
-
-            if (repairResult.repairs.length > 0) {
-              console.log(`[DEBUG] Updating document ${doc._id} with repairs...`);
-              // Create update object with only the repaired fields (exclude _id)
-              const updateData = { ...repairResult.document };
-              delete updateData._id; // Remove _id from update
-              delete updateData.__v; // Remove version key
-              const updateResult = await Model.findByIdAndUpdate(doc._id, { $set: updateData }, { new: true });
-              console.log(`[DEBUG] Update result:`, updateResult ? 'Success' : 'Failed');
-              report.repairsApplied += repairResult.repairs.length;
-
-              repairResult.repairs.forEach(repair => {
-                report.details.push({
-                  documentId: doc._id.toString(),
-                  issue: `${repair.field}: ${repair.action}`,
-                  action: 'repaired',
-                  oldValue: repair.oldValue,
-                  newValue: repair.newValue
-                });
-              });
-
-              console.log(`Repaired document: ${doc._id} with ${repairResult.repairs.length} fixes`);
-            } else {
-              // Document has issues but no automatic repairs were applied
-              report.details.push({
-                documentId: doc._id.toString(),
-                issue: 'inconsistencies_detected',
-                action: 'none',
-                details: issues.map(i => `${i.severity}: ${i.description}`).join('; ')
-              });
-              console.log(`Detected issues in document ${doc._id}: ${issues.length} issues`);
-            }
-          }
-        } catch (docError) {
-          const errorMsg = `Error processing document ${doc._id}: ${docError.message}`;
-          report.errors.push(errorMsg);
-          console.error(errorMsg);
-        }
+      if (documents.length === 0) {
+        console.log('[CHECK] No documents to check');
+        return report;
       }
 
-      // Update eventual consistency status
+      // Check for issues
+      const { issues, expectedFields } = this.validator.checkDocuments(documents);
+      report.inconsistenciesFound = issues.length;
+      
+      console.log(`[CHECK] Found ${issues.length} issues in ${documents.length} documents`);
+      console.log(`[CHECK] Expected fields: ${expectedFields.join(', ')}`);
+
+      // Repair issues
+      if (issues.length > 0) {
+        console.log('[CHECK] Starting repairs...');
+        const repairs = await this.validator.repairDocuments(Model, issues);
+        report.repairsApplied = repairs.length;
+        
+        // Add to report details
+        repairs.forEach(repair => {
+          report.details.push({
+            documentId: repair.documentId,
+            issue: `${repair.field}: ${repair.action}`,
+            action: 'repaired',
+            oldValue: repair.oldValue,
+            newValue: repair.newValue
+          });
+        });
+        
+        console.log(`[CHECK] Completed ${repairs.length} repairs`);
+      }
+
+      // Update status
       await this.updateConsistencyStatus(collectionName, report);
 
     } catch (error) {
       const errorMsg = `Consistency check failed: ${error.message}`;
       report.errors.push(errorMsg);
-      console.error(errorMsg);
+      console.error('[CHECK]', errorMsg);
     } finally {
       report.duration = Date.now() - startTime;
       this.isRunning = false;
-      this.currentCheck = null;
       
-      console.log(`Consistency check completed for ${collectionName}:`);
-      console.log(`- Total documents: ${report.totalDocuments}`);
-      console.log(`- Inconsistencies found: ${report.inconsistenciesFound}`);
-      console.log(`- Repairs applied: ${report.repairsApplied}`);
-      console.log(`- Documents deleted: ${report.documentsDeleted}`);
-      console.log(`- Duration: ${report.duration}ms`);
+      console.log(`[CHECK] Completed:`);
+      console.log(`  - Documents: ${report.totalDocuments}`);
+      console.log(`  - Issues: ${report.inconsistenciesFound}`);
+      console.log(`  - Repairs: ${report.repairsApplied}`);
     }
 
     return report;
   }
 
-  /**
-   * Updates the eventual consistency status in the database
-   * @param {string} collectionName - Name of the collection
-   * @param {Object} report - The consistency check report
-   */
   async updateConsistencyStatus(collectionName, report) {
     try {
-      // For simplicity, we'll store status in a separate collection
-      // In a real system, this would check replica set status
       const Status = require('../models/Status');
-      
       const isConsistent = report.inconsistenciesFound === 0 || 
-                          (report.inconsistenciesFound === report.repairsApplied + report.documentsDeleted);
+                          report.inconsistenciesFound === report.repairsApplied;
       
       await Status.findOneAndUpdate(
         { collection: collectionName },
@@ -144,23 +100,17 @@ class ConsistencyChecker {
           isConsistent,
           lastCheckTime: new Date(),
           lastConsistentTime: isConsistent ? new Date() : undefined,
-          allReplicasConsistent: isConsistent, // Simulated
           lastReportId: report._id
         },
         { upsert: true, new: true }
       );
       
-      console.log(`Updated consistency status for ${collectionName}: ${isConsistent ? 'Consistent' : 'Inconsistent'}`);
+      console.log(`[CHECK] Status: ${isConsistent ? 'Consistent' : 'Inconsistent'}`);
     } catch (error) {
-      console.error(`Failed to update consistency status: ${error.message}`);
+      console.error('[CHECK] Status update failed:', error.message);
     }
   }
 
-  /**
-   * Gets the current consistency status for a collection
-   * @param {string} collectionName - Name of the collection
-   * @returns {Object} Current consistency status
-   */
   async getConsistencyStatus(collectionName) {
     try {
       const Status = require('../models/Status');
@@ -170,9 +120,6 @@ class ConsistencyChecker {
         return {
           collection: collectionName,
           isConsistent: false,
-          lastCheckTime: null,
-          lastConsistentTime: null,
-          allReplicasConsistent: false,
           status: 'never_checked'
         };
       }
@@ -181,38 +128,16 @@ class ConsistencyChecker {
         collection: status.collection,
         isConsistent: status.isConsistent,
         lastCheckTime: status.lastCheckTime,
-        lastConsistentTime: status.lastConsistentTime,
-        allReplicasConsistent: status.allReplicasConsistent,
         status: status.isConsistent ? 'consistent' : 'inconsistent'
       };
     } catch (error) {
-      console.error(`Failed to get consistency status: ${error.message}`);
-      return {
-        collection: collectionName,
-        isConsistent: false,
-        lastCheckTime: null,
-        lastConsistentTime: null,
-        allReplicasConsistent: false,
-        status: 'error',
-        error: error.message
-      };
+      console.error('[CHECK] Get status failed:', error.message);
+      return { collection: collectionName, isConsistent: false, status: 'error' };
     }
   }
 
-  /**
-   * Checks if a consistency check is currently running
-   * @returns {boolean} True if a check is in progress
-   */
   isActive() {
     return this.isRunning;
-  }
-
-  /**
-   * Gets information about the currently running check
-   * @returns {Object|null} Current check information or null
-   */
-  getCurrentCheck() {
-    return this.currentCheck;
   }
 }
 
