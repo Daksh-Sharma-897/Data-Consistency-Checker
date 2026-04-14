@@ -258,8 +258,27 @@ class DynamicValidator {
                 newValue: ''
               });
               repaired[field] = '';
+            } else if (fs && (fs.type === 'number' || fs.type === 'integer')) {
+              repairs.push({
+                field,
+                action: 'replaced_null',
+                oldValue: null,
+                newValue: 0
+              });
+              repaired[field] = 0;
             }
           }
+          break;
+
+        case 'empty_value':
+          // Empty strings in required fields - set to a placeholder
+          repairs.push({
+            field,
+            action: 'replaced_empty',
+            oldValue: '',
+            newValue: 'N/A'
+          });
+          repaired[field] = 'N/A';
           break;
 
         case 'type_mismatch':
