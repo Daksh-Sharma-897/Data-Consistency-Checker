@@ -1,9 +1,11 @@
 const { validateDocument, repairDocument } = require('../validationRules');
+const DynamicValidator = require('./dynamicValidator');
 
 class ConsistencyChecker {
   constructor() {
     this.isRunning = false;
     this.currentCheck = null;
+    this.dynamicValidator = new DynamicValidator();
   }
 
   /**
@@ -34,39 +36,33 @@ class ConsistencyChecker {
 
     try {
       console.log(`Starting consistency check for collection: ${collectionName}`);
-      
+
       // Get all documents in the collection
       const documents = await Model.find({}).lean();
       report.totalDocuments = documents.length;
-      
+
       console.log(`Found ${documents.length} documents to check`);
+
+      // Analyze schema from all documents (dynamic)
+      console.log('Analyzing collection schema...');
+      const schema = this.dynamicValidator.analyzeSchema(documents);
+      console.log(`Detected ${Object.keys(schema.fields).length} fields, ${schema.requiredFields.length} required`);
 
       for (const doc of documents) {
         try {
-          // Validate the document
-          const issues = validateDocument(doc, collectionName);
-          
+          // Validate the document using dynamic schema
+          const issues = this.dynamicValidator.validateDocument(doc, schema);
+
           if (issues.length > 0) {
             report.inconsistenciesFound += issues.length;
-            
+
             // Attempt to repair the document
-            const repairResult = repairDocument(doc, issues, collectionName);
-            
-            if (repairResult.shouldDelete) {
-              // Delete the document if it's irreparable
-              await Model.findByIdAndDelete(doc._id);
-              report.documentsDeleted += 1;
-              report.details.push({
-                documentId: doc._id.toString(),
-                issue: 'irreparable_document',
-                action: 'deleted',
-                details: issues.map(i => i.description).join('; ')
-              });
-              console.log(`Deleted irreparable document: ${doc._id}`);
-            } else if (repairResult.repairs.length > 0) {
+            const repairResult = this.dynamicValidator.repairDocument(doc, issues, schema);
+
+            if (repairResult.repairs.length > 0) {
               await Model.findByIdAndUpdate(doc._id, repairResult.document);
               report.repairsApplied += repairResult.repairs.length;
-              
+
               repairResult.repairs.forEach(repair => {
                 report.details.push({
                   documentId: doc._id.toString(),
@@ -76,16 +72,17 @@ class ConsistencyChecker {
                   newValue: repair.newValue
                 });
               });
-              
+
               console.log(`Repaired document: ${doc._id} with ${repairResult.repairs.length} fixes`);
             } else {
-              // Document has issues but no repairs were applied
+              // Document has issues but no automatic repairs were applied
               report.details.push({
                 documentId: doc._id.toString(),
-                issue: 'unrepaired_issues',
+                issue: 'inconsistencies_detected',
                 action: 'none',
-                details: issues.map(i => i.description).join('; ')
+                details: issues.map(i => `${i.severity}: ${i.description}`).join('; ')
               });
+              console.log(`Detected issues in document ${doc._id}: ${issues.length} issues`);
             }
           }
         } catch (docError) {
