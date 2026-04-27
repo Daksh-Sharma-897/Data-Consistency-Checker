@@ -32,6 +32,10 @@ A comprehensive full-stack application for monitoring and maintaining data consi
 - **Reports Collection**: Historical consistency check reports
 - **Status Collection**: Current consistency status tracking
 
+### Live Demo 
+ - **Link** : http://3.81.20.204:3000
+ - **Mongo Connection Link** : mongodb+srv://dvmp1:minipro123@clustermp.9fcug32.mongodb.net/?appName=ClusterMP 
+
 ## Project Structure
 
 ```
