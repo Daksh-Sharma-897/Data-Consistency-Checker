@@ -313,7 +313,7 @@ For issues and questions:
 1. Check the troubleshooting section
 2. Review the API documentation
 3. Check the browser console for frontend errors
-4. Review server logs for backend issues
+4. Review the server logs for backend issues
 
 ---
 
